@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MalariaFore — AI Forecasting System</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS 4 CDN -->
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style type="text/tailwindcss">
+        @theme {
+            --color-mint-panel: #F0FAF7;
+            --color-healing-bg: #FAFFFE;
+            --color-gentle-teal: #3CBFA0;
+            --color-soft-sage: #7EC8B0;
+            --color-sky-blue: #D6F0F5;
+            --color-soft-coral: #F4A08A;
+            --font-nunito: "Nunito", sans-serif;
+            --font-inter: "Inter", sans-serif;
+        }
+
+        body {
+            @apply bg-healing-bg font-inter text-slate-700 overflow-x-hidden;
+        }
+
+        h1, h2, h3, h4 {
+            @apply font-nunito font-bold;
+        }
+
+        .card {
+            @apply bg-white rounded-[20px] shadow-[0_4px_20px_rgba(60,191,160,0.08)] border-l-4 border-gentle-teal transition-all duration-300;
+        }
+
+        .btn-teal {
+            @apply bg-gradient-to-r from-gentle-teal to-soft-sage text-white px-6 py-2.5 rounded-full font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0;
+        }
+
+        .sidebar-item {
+            @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer hover:bg-mint-panel text-slate-600 hover:text-gentle-teal;
+        }
+
+        .sidebar-item.active {
+            @apply bg-mint-panel text-gentle-teal font-semibold;
+        }
+
+        .page-transition {
+            @apply transition-all duration-500 ease-out;
+        }
+
+        .hidden-page {
+            @apply opacity-0 translate-y-4 pointer-events-none absolute inset-0;
+        }
+
+        .visible-page {
+            @apply opacity-100 translate-y-0 relative;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            @apply bg-mint-panel;
+        }
+        ::-webkit-scrollbar-thumb {
+            @apply bg-soft-sage rounded-full;
+        }
+
+        @keyframes pulse-soft {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .pulse-card {
+            animation: pulse-soft 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app" class="min-h-screen flex flex-col">
+        
+        <!-- Login Page -->
+        <div id="login-page" class="fixed inset-0 z-[100] bg-gradient-to-br from-white to-mint-panel flex items-center justify-center p-4 transition-opacity duration-700">
+            <div class="card max-w-md w-full p-8 border-l-0 border-t-4 border-gentle-teal text-center">
+                <div class="text-6xl mb-4">🦟</div>
+                <h1 class="text-3xl text-gentle-teal mb-1">MalariaFore</h1>
+                <p class="text-slate-500 font-medium mb-8 italic">"Predict. Prevent. Protect."</p>
+                
+                <div class="space-y-4 text-left">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1 ml-1">Username</label>
+                        <input type="text" id="username" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-gentle-teal/20 focus:border-gentle-teal transition-all" placeholder="admin or user">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1 ml-1">Password</label>
+                        <input type="password" id="password" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-gentle-teal/20 focus:border-gentle-teal transition-all" placeholder="••••••••">
+                    </div>
+                    <button onclick="handleLogin()" class="btn-teal w-full mt-4 flex items-center justify-center gap-2">
+                        <span id="login-text">Login to Dashboard</span>
+                        <div id="login-loader" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    </button>
+                </div>
+                
+                <div class="mt-8 pt-6 border-t border-slate-100 text-xs text-slate-400">
+                    <p>Demo Credentials:</p>
+                    <p>Admin: admin / admin123 | User: user / user123</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Layout (Hidden by default) -->
+        <div id="dashboard" class="hidden flex-1 flex overflow-hidden">
+            
+            <!-- Sidebar -->
+            <aside id="sidebar" class="w-64 bg-white border-r border-slate-100 flex flex-col transition-all duration-300 z-50">
+                <div class="p-6 flex items-center gap-3 border-b border-slate-50">
+                    <span class="text-3xl">🦟</span>
+                    <div>
+                        <h2 class="text-xl text-gentle-teal leading-tight">MalariaFore</h2>
+                        <div id="user-badge" class="text-[10px] uppercase tracking-widest font-bold bg-mint-panel text-gentle-teal px-2 py-0.5 rounded-md inline-block">Role: Admin</div>
+                    </div>
+                </div>
+                
+                <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                    <div onclick="showPage('home')" class="sidebar-item active" data-page="home">
+                        <span>🏠</span> Home ★
+                    </div>
+                    <div id="nav-upload" onclick="showPage('upload')" class="sidebar-item" data-page="upload">
+                        <span>📂</span> Upload & Preview
+                    </div>
+                    <div id="nav-train" onclick="showPage('train')" class="sidebar-item" data-page="train">
+                        <span>🧠</span> Train & Forecast
+                    </div>
+                    <div onclick="showPage('trend')" class="sidebar-item" data-page="trend">
+                        <span>📈</span> Trend Analysis ★
+                    </div>
+                    <div onclick="showPage('map')" class="sidebar-item" data-page="map">
+                        <span>🗺️</span> District Map ★
+                    </div>
+                    <div id="nav-resource" onclick="showPage('resource')" class="sidebar-item" data-page="resource">
+                        <span>📦</span> Resource Allocation
+                    </div>
+                </nav>
+                
+                <div class="p-4 border-t border-slate-50">
+                    <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-soft-coral hover:bg-red-50 transition-all">
+                        <span>🚪</span> Logout
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 overflow-y-auto bg-healing-bg relative">
+                
+                <!-- Home Page -->
+                <section id="page-home" class="page-transition visible-page p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="mb-12">
+                            <h1 class="text-4xl text-slate-800 mb-2">AI-Powered Malaria Forecasting</h1>
+                            <p class="text-lg text-slate-500">Advanced LSTM + Spatial Analysis for Tamil Nadu Public Health</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                            <div class="card p-6 pulse-card">
+                                <div class="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-2">Districts Monitored</div>
+                                <div class="text-4xl font-extrabold text-gentle-teal counter" data-target="15">0</div>
+                            </div>
+                            <div class="card p-6 border-l-soft-sage">
+                                <div class="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-2">Avg Monthly Cases</div>
+                                <div class="text-4xl font-extrabold text-soft-sage counter" data-target="1247">0</div>
+                            </div>
+                            <div class="card p-6 border-l-sky-blue">
+                                <div class="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-2">Forecast Accuracy</div>
+                                <div class="text-4xl font-extrabold text-sky-blue"><span class="counter" data-target="91">0</span>.<span class="counter" data-target="4">0</span>%</div>
+                            </div>
+                            <div class="card p-6 border-l-soft-coral">
+                                <div class="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-2">Resource Types</div>
+                                <div class="text-4xl font-extrabold text-soft-coral counter" data-target="3">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-mint-panel to-sky-blue/30 rounded-[30px] p-12 mb-12 relative overflow-hidden">
+                            <div class="relative z-10 max-w-2xl">
+                                <h2 class="text-3xl text-slate-800 mb-4">Protecting Communities with Data</h2>
+                                <p class="text-slate-600 mb-6 leading-relaxed">Our system integrates meteorological data, historical case reports, and spatial trends to provide early warnings for malaria outbreaks across Tamil Nadu's diverse districts.</p>
+                                <button onclick="showPage('map')" class="btn-teal">Explore District Map</button>
+                            </div>
+                            <div class="absolute right-[-50px] bottom-[-50px] text-[200px] opacity-10 rotate-12 select-none">🌿</div>
+                        </div>
+
+                        <div class="text-center mb-12">
+                            <h2 class="text-2xl text-slate-800 mb-8">How It Works</h2>
+                            <div class="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-0">
+                                <div class="flex flex-col items-center z-10">
+                                    <div class="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-2xl border-2 border-gentle-teal mb-4">1</div>
+                                    <h3 class="font-bold">Upload Data</h3>
+                                    <p class="text-sm text-slate-500">Import health records</p>
+                                </div>
+                                <div class="hidden md:block h-0.5 w-32 bg-gentle-teal/20 -mt-12"></div>
+                                <div class="flex flex-col items-center z-10">
+                                    <div class="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-2xl border-2 border-gentle-teal mb-4">2</div>
+                                    <h3 class="font-bold">Train Model</h3>
+                                    <p class="text-sm text-slate-500">Run LSTM analysis</p>
+                                </div>
+                                <div class="hidden md:block h-0.5 w-32 bg-gentle-teal/20 -mt-12"></div>
+                                <div class="flex flex-col items-center z-10">
+                                    <div class="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-2xl border-2 border-gentle-teal mb-4">3</div>
+                                    <h3 class="font-bold">View Forecast</h3>
+                                    <p class="text-sm text-slate-500">Allocate resources</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Upload Page -->
+                <section id="page-upload" class="page-transition hidden-page p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <h1 class="text-3xl text-slate-800 mb-8">Data Upload & Preview</h1>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div class="lg:col-span-1 space-y-6">
+                                <div class="card p-6">
+                                    <h3 class="text-lg mb-4">Upload Dataset</h3>
+                                    <div class="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:border-gentle-teal transition-colors cursor-pointer group">
+                                        <div class="text-4xl mb-2 group-hover:scale-110 transition-transform">📄</div>
+                                        <p class="text-sm text-slate-500">Drag & drop CSV/Excel files here or <span class="text-gentle-teal font-bold">Browse</span></p>
+                                    </div>
+                                    <button onclick="loadSampleData()" class="w-full mt-6 py-3 rounded-xl border-2 border-gentle-teal text-gentle-teal font-bold hover:bg-gentle-teal hover:text-white transition-all">
+                                        Load Sample Dataset
+                                    </button>
+                                </div>
+                                
+                                <div id="data-summary" class="card p-6 hidden">
+                                    <h3 class="text-lg mb-4">Dataset Summary</h3>
+                                    <div class="space-y-3">
+                                        <div class="flex justify-between text-sm">
+                                            <span class="text-slate-500">Total Rows:</span>
+                                            <span class="font-bold">20</span>
+                                        </div>
+                                        <div class="flex justify-between text-sm">
+                                            <span class="text-slate-500">Districts:</span>
+                                            <span class="font-bold">5</span>
+                                        </div>
+                                        <div class="flex justify-between text-sm">
+                                            <span class="text-slate-500">Date Range:</span>
+                                            <span class="font-bold">Jan 2023 - Aug 2023</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="lg:col-span-2">
+                                <div class="card overflow-hidden">
+                                    <div class="p-6 border-b border-slate-50 flex justify-between items-center">
+                                        <h3 class="text-lg">Data Preview</h3>
+                                        <div class="text-xs text-slate-400">Showing top 20 rows</div>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left">
+                                            <thead class="bg-mint-panel text-gentle-teal text-xs uppercase tracking-wider">
+                                                <tr>
+                                                    <th class="px-6 py-4 font-bold">Date</th>
+                                                    <th class="px-6 py-4 font-bold">District</th>
+                                                    <th class="px-6 py-4 font-bold">Cases</th>
+                                                    <th class="px-6 py-4 font-bold">Rainfall (mm)</th>
+                                                    <th class="px-6 py-4 font-bold">Temp (°C)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="preview-table-body" class="text-sm divide-y divide-slate-50">
+                                                <tr>
+                                                    <td colspan="5" class="px-6 py-12 text-center text-slate-400 italic">No data loaded. Click "Load Sample Dataset" to begin.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Train Page -->
+                <section id="page-train" class="page-transition hidden-page p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <h1 class="text-3xl text-slate-800 mb-8">Model Training & Forecasting</h1>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+                            <div class="lg:col-span-1">
+                                <div class="card p-6">
+                                    <h3 class="text-lg mb-6">Training Config</h3>
+                                    <div class="mb-8">
+                                        <label class="block text-sm font-semibold text-slate-600 mb-4">Forecast Horizon (Months)</label>
+                                        <input type="range" min="1" max="12" value="6" class="w-full h-2 bg-mint-panel rounded-lg appearance-none cursor-pointer accent-gentle-teal" id="horizon-slider">
+                                        <div class="flex justify-between text-xs text-slate-400 mt-2">
+                                            <span>1m</span>
+                                            <span id="horizon-val" class="font-bold text-gentle-teal">6 months</span>
+                                            <span>12m</span>
+                                        </div>
+                                    </div>
+                                    <button onclick="startTraining()" id="train-btn" class="btn-teal w-full">Train LSTM Model</button>
+                                </div>
+                            </div>
+                            
+                            <div class="lg:col-span-3">
+                                <div id="training-status" class="card p-8 h-full flex flex-col items-center justify-center text-center">
+                                    <div id="train-idle">
+                                        <div class="text-6xl mb-4 opacity-20">🧠</div>
+                                        <h3 class="text-xl text-slate-400 italic">Configure and start training to see results</h3>
+                                    </div>
+                                    
+                                    <div id="train-active" class="hidden w-full max-w-md">
+                                        <h3 class="text-xl mb-6">Training LSTM Model...</h3>
+                                        <div class="w-full bg-mint-panel rounded-full h-4 mb-4 overflow-hidden">
+                                            <div id="train-progress" class="bg-gentle-teal h-full w-0 transition-all duration-300"></div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                            <div class="bg-slate-50 p-3 rounded-xl">
+                                                <div class="text-slate-400 uppercase text-[10px] font-bold">Epoch</div>
+                                                <div id="epoch-count" class="text-xl font-bold text-gentle-teal">0 / 80</div>
+                                            </div>
+                                            <div class="bg-slate-50 p-3 rounded-xl">
+                                                <div class="text-slate-400 uppercase text-[10px] font-bold">Loss</div>
+                                                <div id="loss-val" class="text-xl font-bold text-soft-coral">0.420</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="train-success" class="hidden w-full">
+                                        <div class="bg-green-50 text-green-700 p-4 rounded-2xl mb-8 flex items-center justify-center gap-3 font-bold">
+                                            <span>✅</span> Model trained! Accuracy: 91.4% | Loss: 0.018
+                                        </div>
+                                        <div class="overflow-hidden rounded-2xl border border-slate-100">
+                                            <table class="w-full text-left text-sm">
+                                                <thead class="bg-mint-panel text-gentle-teal text-xs uppercase">
+                                                    <tr>
+                                                        <th class="px-4 py-3">Month</th>
+                                                        <th class="px-4 py-3">District</th>
+                                                        <th class="px-4 py-3">Pred. Cases</th>
+                                                        <th class="px-4 py-3">RDT Kits</th>
+                                                        <th class="px-4 py-3">ACT Doses</th>
+                                                        <th class="px-4 py-3">Bed Nets</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="forecast-table-body" class="divide-y divide-slate-50">
+                                                    <!-- Filled by JS -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Trend Page -->
+                <section id="page-trend" class="page-transition hidden-page p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                            <h1 class="text-3xl text-slate-800">Trend Analysis</h1>
+                            <div class="flex gap-4">
+                                <select id="trend-district" onchange="updateCharts()" class="px-4 py-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-gentle-teal/20">
+                                    <!-- Options filled by JS -->
+                                </select>
+                                <div class="flex bg-white rounded-xl border border-slate-200 p-1">
+                                    <button onclick="setChartView('hist')" id="btn-hist" class="px-4 py-1.5 rounded-lg text-sm font-bold bg-gentle-teal text-white">Historical</button>
+                                    <button onclick="setChartView('fore')" id="btn-fore" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-mint-panel">Forecast</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="card p-6">
+                                <h3 class="text-lg mb-6">Case Trends Over Time</h3>
+                                <div class="h-[300px]">
+                                    <canvas id="lineChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="card p-6">
+                                <h3 class="text-lg mb-6">Monthly Average Distribution</h3>
+                                <div class="h-[300px]">
+                                    <canvas id="barChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8 card p-6 bg-mint-panel/30 border-l-sky-blue">
+                            <div class="flex gap-4">
+                                <div class="text-2xl">💡</div>
+                                <div>
+                                    <h4 class="font-bold text-slate-800">Insight Annotation</h4>
+                                    <p class="text-sm text-slate-600">Historical data shows a significant spike in cases during the <span class="font-bold text-gentle-teal">July-September</span> monsoon period. The LSTM model predicts a similar seasonal trend for the upcoming cycle with a 12% lower peak due to ongoing intervention programs.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Map Page -->
+                <section id="page-map" class="page-transition hidden-page p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="flex justify-between items-center mb-8">
+                            <h1 class="text-3xl text-slate-800">District Risk Map</h1>
+                            <select id="map-month" onchange="updateMap()" class="px-4 py-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-gentle-teal/20">
+                                <option value="0">Oct 2023 (Forecast)</option>
+                                <option value="1">Nov 2023 (Forecast)</option>
+                                <option value="2">Dec 2023 (Forecast)</option>
+                                <option value="3">Jan 2024 (Forecast)</option>
+                                <option value="4">Feb 2024 (Forecast)</option>
+                                <option value="5">Mar 2024 (Forecast)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div class="lg:col-span-2">
+                                <div class="card p-4 h-[600px] relative">
+                                    <div id="map" class="w-full h-full rounded-2xl z-10"></div>
+                                    <div class="absolute bottom-8 right-8 z-20 bg-white/90 backdrop-blur p-4 rounded-2xl shadow-lg border border-slate-100 text-xs">
+                                        <div class="font-bold mb-2">Risk Level (Predicted Cases)</div>
+                                        <div class="space-y-2">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-3 h-3 rounded-full bg-[#3CBFA0]"></div>
+                                                <span>Low (&lt; 80)</span>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-3 h-3 rounded-full bg-[#FFD93D]"></div>
+                                                <span>Moderate (80-150)</span>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-3 h-3 rounded-full bg-[#F4A08A]"></div>
+                                                <span>High (&gt; 150)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="lg:col-span-1">
+                                <div class="card h-[600px] flex flex-col">
+                                    <div class="p-6 border-b border-slate-50">
+                                        <h3 class="text-lg">District Rankings</h3>
+                                    </div>
+                                    <div class="flex-1 overflow-y-auto p-4 space-y-3" id="map-ranking-list">
+                                        <!-- Filled by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Resource Page -->
+                <section id="page-resource" class="page-transition hidden-page p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="flex justify-between items-center mb-8">
+                            <h1 class="text-3xl text-slate-800">Resource Allocation</h1>
+                            <button onclick="generateReport()" id="report-btn" class="btn-teal flex items-center gap-2">
+                                <span>📄</span> Generate Dispatch Report
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                            <div class="card p-6 lg:col-span-2">
+                                <h3 class="text-lg mb-6">Zonal Resource Requirements</h3>
+                                <div class="h-[350px]">
+                                    <canvas id="resourceBarChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="card p-6">
+                                <h3 class="text-lg mb-6">Total Inventory Status</h3>
+                                <div class="h-[350px]">
+                                    <canvas id="resourceTotalChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                            <div class="card p-6">
+                                <h3 class="text-lg mb-6">Resource Type Distribution</h3>
+                                <div class="h-[350px] flex items-center justify-center">
+                                    <canvas id="resourcePieChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="card p-6 bg-gentle-teal/5 border-gentle-teal/20">
+                                <h3 class="text-lg mb-4 text-gentle-teal">Bed Net Distribution Focus</h3>
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-end">
+                                        <div>
+                                            <div class="text-sm text-slate-500">Total Nets Dispatched</div>
+                                            <div class="text-3xl font-bold text-slate-800">8,260</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs font-bold text-gentle-teal uppercase">Target Met</div>
+                                            <div class="text-xl font-bold text-gentle-teal">92%</div>
+                                        </div>
+                                    </div>
+                                    <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                        <div class="bg-gentle-teal h-full" style="width: 92%"></div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4 pt-4">
+                                        <div class="p-3 bg-white rounded-xl border border-gentle-teal/10">
+                                            <div class="text-[10px] uppercase font-bold text-slate-400">Long-Lasting (LLIN)</div>
+                                            <div class="text-lg font-bold">6,400</div>
+                                        </div>
+                                        <div class="p-3 bg-white rounded-xl border border-gentle-teal/10">
+                                            <div class="text-[10px] uppercase font-bold text-slate-400">Standard Nets</div>
+                                            <div class="text-lg font-bold">1,860</div>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-slate-500 italic mt-2">
+                                        *Prioritizing high-risk districts in South and North zones based on seasonal forecast.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="card p-6 bg-mint-panel/20">
+                                <div class="text-xs font-bold text-gentle-teal uppercase mb-2">North Zone</div>
+                                <div class="text-2xl font-bold">4,250 Units</div>
+                                <div class="text-xs text-slate-400 mt-1">4 Districts Covered</div>
+                            </div>
+                            <div class="card p-6 bg-mint-panel/20">
+                                <div class="text-xs font-bold text-gentle-teal uppercase mb-2">West Zone</div>
+                                <div class="text-2xl font-bold">3,820 Units</div>
+                                <div class="text-xs text-slate-400 mt-1">4 Districts Covered</div>
+                            </div>
+                            <div class="card p-6 bg-mint-panel/20">
+                                <div class="text-xs font-bold text-gentle-teal uppercase mb-2">South Zone</div>
+                                <div class="text-2xl font-bold">5,100 Units</div>
+                                <div class="text-xs text-slate-400 mt-1">4 Districts Covered</div>
+                            </div>
+                            <div class="card p-6 bg-mint-panel/20">
+                                <div class="text-xs font-bold text-gentle-teal uppercase mb-2">East Zone</div>
+                                <div class="text-2xl font-bold">2,940 Units</div>
+                                <div class="text-xs text-slate-400 mt-1">3 Districts Covered</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 opacity-0 translate-y-8 transition-all duration-300 pointer-events-none">
+            <span id="toast-icon">✅</span>
+            <span id="toast-msg">Success!</span>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & STATE ---
+        const districts = [
+            "Chennai", "Madurai", "Coimbatore", "Trichy", "Salem", 
+            "Tirunelveli", "Vellore", "Thoothukudi", "Erode", "Thanjavur", 
+            "Dindigul", "Kanchipuram", "Dharmapuri", "Krishnagiri", "Nagapattinam"
+        ];
+
+        const zones = {
+            "North": ["Chennai", "Vellore", "Kanchipuram", "Dharmapuri"],
+            "West": ["Coimbatore", "Erode", "Krishnagiri", "Salem"],
+            "South": ["Madurai", "Tirunelveli", "Thoothukudi", "Dindigul"],
+            "East": ["Trichy", "Thanjavur", "Nagapattinam"]
+        };
+
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const forecastMonths = ["Oct 2023", "Nov 2023", "Dec 2023", "Jan 2024", "Feb 2024", "Mar 2024"];
+
+        let currentUser = null;
+        let activePage = 'home';
+        let chartInstances = {};
+        let mapInstance = null;
+        let mapMarkers = [];
+
+        // --- AUTH ---
+        function handleLogin() {
+            const user = document.getElementById('username').value.toLowerCase();
+            const pass = document.getElementById('password').value;
+            
+            const loginBtn = document.querySelector('#login-page button');
+            const loginText = document.getElementById('login-text');
+            const loginLoader = document.getElementById('login-loader');
+            
+            loginText.classList.add('hidden');
+            loginLoader.classList.remove('hidden');
+            
+            setTimeout(() => {
+                if (user === 'admin' || user === 'user') {
+                    currentUser = user === 'admin' ? 'Admin' : 'Viewer';
+                    setupDashboard();
+                    document.getElementById('login-page').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('login-page').classList.add('hidden');
+                        document.getElementById('dashboard').classList.remove('hidden');
+                        animateCounters();
+                    }, 700);
+                } else {
+                    // Just proceed for demo as requested
+                    currentUser = 'Viewer';
+                    setupDashboard();
+                    document.getElementById('login-page').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    animateCounters();
+                }
+            }, 1500);
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('login-page').style.opacity = '1';
+            document.getElementById('login-text').classList.remove('hidden');
+            document.getElementById('login-loader').classList.add('hidden');
+        }
+
+        function setupDashboard() {
+            document.getElementById('user-badge').innerText = `Role: ${currentUser}`;
+            const isAdmin = currentUser === 'Admin';
+            
+            document.getElementById('nav-upload').style.display = isAdmin ? 'flex' : 'none';
+            document.getElementById('nav-train').style.display = isAdmin ? 'flex' : 'none';
+            document.getElementById('nav-resource').style.display = isAdmin ? 'flex' : 'none';
+            
+            // Fill Selects
+            const trendSelect = document.getElementById('trend-district');
+            trendSelect.innerHTML = districts.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+
+        // --- NAVIGATION ---
+        function showPage(pageId) {
+            const pages = ['home', 'upload', 'train', 'trend', 'map', 'resource'];
+            pages.forEach(p => {
+                const el = document.getElementById(`page-${p}`);
+                if (p === pageId) {
+                    el.classList.remove('hidden-page');
+                    el.classList.add('visible-page');
+                } else {
+                    el.classList.add('hidden-page');
+                    el.classList.remove('visible-page');
+                }
+            });
+
+            // Update Sidebar
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                if (item.dataset.page === pageId) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+
+            activePage = pageId;
+            if (pageId === 'trend') initTrendCharts();
+            if (pageId === 'map') initMap();
+            if (pageId === 'resource') initResourceCharts();
+        }
+
+        // --- HOME PAGE ---
+        function animateCounters() {
+            const counters = document.querySelectorAll('.counter');
+            counters.forEach(counter => {
+                const target = +counter.getAttribute('data-target');
+                let count = 0;
+                const increment = target / 50;
+                const updateCount = () => {
+                    if (target > count) {
+                        count += increment;
+                        counter.innerText = Math.ceil(count);
+                        setTimeout(updateCount, 20);
+                    } else {
+                        counter.innerText = target;
+                    }
+                };
+                updateCount();
+            });
+        }
+
+        // --- UPLOAD PAGE ---
+        function loadSampleData() {
+            const tbody = document.getElementById('preview-table-body');
+            const data = [];
+            for (let i = 0; 20 > i; i++) {
+                data.push({
+                    date: `2023-0${Math.floor(i/5)+1}-15`,
+                    district: districts[i % 5],
+                    cases: Math.floor(Math.random() * 200) + 50,
+                    rainfall: (Math.random() * 150 + 20).toFixed(1),
+                    temp: (Math.random() * 10 + 25).toFixed(1)
+                });
+            }
+
+            tbody.innerHTML = data.map(row => `
+                <tr class="hover:bg-mint-panel/30 transition-colors">
+                    <td class="px-6 py-4">${row.date}</td>
+                    <td class="px-6 py-4 font-semibold">${row.district}</td>
+                    <td class="px-6 py-4">${row.cases}</td>
+                    <td class="px-6 py-4">${row.rainfall}</td>
+                    <td class="px-6 py-4">${row.temp}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('data-summary').classList.remove('hidden');
+            showToast('✅ Sample dataset loaded successfully!');
+        }
+
+        // --- TRAIN PAGE ---
+        document.getElementById('horizon-slider').addEventListener('input', (e) => {
+            document.getElementById('horizon-val').innerText = `${e.target.value} months`;
+        });
+
+        function startTraining() {
+            const trainBtn = document.getElementById('train-btn');
+            const idle = document.getElementById('train-idle');
+            const active = document.getElementById('train-active');
+            const success = document.getElementById('train-success');
+            const progress = document.getElementById('train-progress');
+            const epochEl = document.getElementById('epoch-count');
+            const lossEl = document.getElementById('loss-val');
+
+            trainBtn.disabled = true;
+            idle.classList.add('hidden');
+            active.classList.remove('hidden');
+            success.classList.add('hidden');
+
+            let epoch = 0;
+            let loss = 0.420;
+            const interval = setInterval(() => {
+                epoch++;
+                loss -= 0.005;
+                const percent = (epoch / 80) * 100;
+                
+                progress.style.width = `${percent}%`;
+                epochEl.innerText = `${epoch} / 80`;
+                lossEl.innerText = loss.toFixed(3);
+
+                if (epoch >= 80) {
+                    clearInterval(interval);
+                    active.classList.add('hidden');
+                    success.classList.remove('hidden');
+                    trainBtn.disabled = false;
+                    fillForecastTable();
+                }
+            }, 50);
+        }
+
+        function fillForecastTable() {
+            const tbody = document.getElementById('forecast-table-body');
+            const data = [];
+            districts.forEach(d => {
+                const cases = Math.floor(Math.random() * 250) + 20;
+                data.push({
+                    month: "Oct 2023",
+                    district: d,
+                    cases: cases,
+                    rdt: Math.ceil(cases * 1.5),
+                    act: Math.ceil(cases * 0.8),
+                    nets: Math.ceil(cases * 2.2)
+                });
+            });
+
+            tbody.innerHTML = data.slice(0, 10).map(row => {
+                let colorClass = 'text-green-600';
+                if (row.cases > 150) colorClass = 'text-soft-coral';
+                else if (row.cases > 80) colorClass = 'text-yellow-600';
+
+                return `
+                    <tr class="hover:bg-mint-panel/30">
+                        <td class="px-4 py-3">${row.month}</td>
+                        <td class="px-4 py-3 font-bold">${row.district}</td>
+                        <td class="px-4 py-3 font-extrabold ${colorClass}">${row.cases}</td>
+                        <td class="px-4 py-3">${row.rdt}</td>
+                        <td class="px-4 py-3">${row.act}</td>
+                        <td class="px-4 py-3">${row.nets}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- TREND PAGE ---
+        let chartView = 'hist';
+        function setChartView(view) {
+            chartView = view;
+            document.getElementById('btn-hist').className = view === 'hist' ? 'px-4 py-1.5 rounded-lg text-sm font-bold bg-gentle-teal text-white' : 'px-4 py-1.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-mint-panel';
+            document.getElementById('btn-fore').className = view === 'fore' ? 'px-4 py-1.5 rounded-lg text-sm font-bold bg-gentle-teal text-white' : 'px-4 py-1.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-mint-panel';
+            updateCharts();
+        }
+
+        function initTrendCharts() {
+            if (chartInstances.line) return;
+
+            const ctxLine = document.getElementById('lineChart').getContext('2d');
+            chartInstances.line = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 36}, (_, i) => `M${i+1}`),
+                    datasets: [{
+                        label: 'Malaria Cases',
+                        data: Array.from({length: 36}, (_, i) => 100 + 50 * Math.sin(i * 0.5) + Math.random() * 30),
+                        borderColor: '#3CBFA0',
+                        backgroundColor: 'rgba(60, 191, 160, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#f0f0f0' } }, x: { grid: { display: false } } }
+                }
+            });
+
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            chartInstances.bar = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Avg Cases',
+                        data: [45, 38, 42, 55, 80, 140, 190, 210, 160, 95, 60, 50],
+                        backgroundColor: months.map((m, i) => (i>=5 && 8 >= i) ? '#F4A08A' : '#7EC8B0'),
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#f0f0f0' } }, x: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function updateCharts() {
+            if (!chartInstances.line) return;
+            const district = document.getElementById('trend-district').value;
+            
+            // Randomize data based on district for demo
+            const seed = districts.indexOf(district);
+            const newData = Array.from({length: 36}, (_, i) => 80 + seed * 10 + 40 * Math.sin(i * 0.5 + seed) + Math.random() * 20);
+            
+            if (chartView === 'fore') {
+                const foreData = Array.from({length: 6}, (_, i) => 100 + seed * 5 + 30 * Math.sin((i+36) * 0.5 + seed));
+                chartInstances.line.data.labels = [...Array.from({length: 36}, (_, i) => `M${i+1}`), ...forecastMonths];
+                chartInstances.line.data.datasets[0].data = [...newData, ...foreData];
+                chartInstances.line.data.datasets[0].segment = {
+                    borderDash: ctx => ctx.p0DataIndex >= 35 ? [5, 5] : undefined,
+                    borderColor: ctx => ctx.p0DataIndex >= 35 ? '#F4A08A' : '#3CBFA0'
+                };
+            } else {
+                chartInstances.line.data.labels = Array.from({length: 36}, (_, i) => `M${i+1}`);
+                chartInstances.line.data.datasets[0].data = newData;
+                chartInstances.line.data.datasets[0].segment = undefined;
+                chartInstances.line.data.datasets[0].borderColor = '#3CBFA0';
+            }
+            
+            chartInstances.line.update();
+            showToast(`📈 Chart updated for ${district}`);
+        }
+
+        // --- MAP PAGE ---
+        function initMap() {
+            if (mapInstance) return;
+
+            // Tamil Nadu approximate center
+            mapInstance = L.map('map', {
+                center: [11.1271, 78.6569],
+                zoom: 7,
+                zoomControl: false
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(mapInstance);
+
+            updateMap();
+        }
+
+        function updateMap() {
+            if (!mapInstance) return;
+
+            // Clear markers
+            mapMarkers.forEach(m => mapInstance.removeLayer(m));
+            mapMarkers = [];
+
+            const monthIdx = document.getElementById('map-month').value;
+            const rankingList = document.getElementById('map-ranking-list');
+            rankingList.innerHTML = '';
+
+            const districtCoords = {
+                "Chennai": [13.0827, 80.2707],
+                "Madurai": [9.9252, 78.1198],
+                "Coimbatore": [11.0168, 76.9558],
+                "Trichy": [10.7905, 78.7047],
+                "Salem": [11.6643, 78.1460],
+                "Tirunelveli": [8.7139, 77.7567],
+                "Vellore": [12.9165, 79.1325],
+                "Thoothukudi": [8.7642, 78.1348],
+                "Erode": [11.3410, 77.7172],
+                "Thanjavur": [10.7870, 79.1378],
+                "Dindigul": [10.3673, 77.9803],
+                "Kanchipuram": [12.8342, 79.7036],
+                "Dharmapuri": [12.1273, 78.1582],
+                "Krishnagiri": [12.5186, 78.2137],
+                "Nagapattinam": [10.7672, 79.8444]
+            };
+
+            const data = districts.map(d => {
+                const cases = Math.floor(Math.random() * 220) + 30;
+                return {
+                    name: d,
+                    cases: cases,
+                    coords: districtCoords[d],
+                    rdt: Math.ceil(cases * 1.5),
+                    act: Math.ceil(cases * 0.8),
+                    nets: Math.ceil(cases * 2.2)
+                };
+            }).sort((a, b) => b.cases - a.cases);
+
+            data.forEach(d => {
+                let color = '#3CBFA0';
+                if (d.cases > 150) color = '#F4A08A';
+                else if (d.cases > 80) color = '#FFD93D';
+
+                const marker = L.circleMarker(d.coords, {
+                    radius: Math.sqrt(d.cases) * 1.5,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(mapInstance);
+
+                marker.bindTooltip(`
+                    <div class="p-2 font-inter">
+                        <div class="font-bold text-lg mb-1">${d.name}</div>
+                        <div class="text-sm">Pred. Cases: <span class="font-bold">${d.cases}</span></div>
+                        <div class="grid grid-cols-3 gap-2 mt-2 text-[10px] uppercase font-bold text-slate-400">
+                            <div class="text-center">RDT<br><span class="text-slate-700">${d.rdt}</span></div>
+                            <div class="text-center">ACT<br><span class="text-slate-700">${d.act}</span></div>
+                            <div class="text-center">NETS<br><span class="text-slate-700">${d.nets}</span></div>
+                        </div>
+                    </div>
+                `, { sticky: true });
+
+                mapMarkers.push(marker);
+
+                // Add to ranking list
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-2 h-2 rounded-full" style="background: ${color}"></div>
+                        <span class="font-semibold text-sm">${d.name}</span>
+                    </div>
+                    <span class="font-bold text-slate-700">${d.cases}</span>
+                `;
+                rankingList.appendChild(item);
+            });
+        }
+
+        // --- RESOURCE PAGE ---
+        function initResourceCharts() {
+            if (chartInstances.resourceBar) return;
+
+            const ctxBar = document.getElementById('resourceBarChart').getContext('2d');
+            chartInstances.resourceBar = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(zones),
+                    datasets: [
+                        { label: 'RDT Kits', data: [1200, 1100, 1500, 900], backgroundColor: '#3CBFA0' },
+                        { label: 'ACT Doses', data: [800, 750, 1000, 600], backgroundColor: '#7EC8B0' },
+                        { label: 'Bed Nets', data: [2250, 1970, 2600, 1440], backgroundColor: '#D6F0F5' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { stacked: true, beginAtZero: true }, x: { stacked: true } }
+                }
+            });
+
+            const ctxTotal = document.getElementById('resourceTotalChart').getContext('2d');
+            chartInstances.resourceTotal = new Chart(ctxTotal, {
+                type: 'bar',
+                data: {
+                    labels: ['RDT Kits', 'ACT Doses', 'Bed Nets'],
+                    datasets: [{
+                        label: 'Total Units',
+                        data: [4700, 3150, 8260],
+                        backgroundColor: ['#3CBFA0', '#7EC8B0', '#D6F0F5'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+
+            const ctxPie = document.getElementById('resourcePieChart').getContext('2d');
+            chartInstances.resourcePie = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: ['RDT Kits', 'ACT Doses', 'Bed Nets'],
+                    datasets: [{
+                        data: [4700, 3150, 8260],
+                        backgroundColor: ['#3CBFA0', '#7EC8B0', '#D6F0F5'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function generateReport() {
+            const btn = document.getElementById('report-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span>⏳</span> Generating...';
+            btn.disabled = true;
+
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                showToast('✅ Dispatch report generated and ready for download!', '📄');
+            }, 2000);
+        }
+
+        // --- UTILS ---
+        function showToast(msg, icon = '✅') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            toastMsg.innerText = msg;
+            toastIcon.innerText = icon;
+            
+            toast.classList.remove('opacity-0', 'translate-y-8', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-8', 'pointer-events-none');
+            }, 3000);
+        }
+
+        // Handle URL hash for direct page access if needed
+        window.addEventListener('load', () => {
+            // Initial state check
+        });
+    </script>
+</body>
+</html>
+
